@@ -39,6 +39,37 @@ jobs:
       with:
         path: "probe-dist"
         name: HBC minimal loader probe
+    - name: Build HBC standalone with standard devkitPro Wii CRT
+      run: |
+        cd channel/channelapp
+        make channelapp_standard.elf
+        ${DEVKITPRO}/tools/bin/elf2dol channelapp_standard.elf hbc-standard.dol
+        python3 - <<'PY'
+        import os, struct
+        p = "hbc-standard.dol"
+        dol = open(p, "rb").read()
+        entry = struct.unpack_from(">I", dol, 0xE0)[0]
+        text = [(struct.unpack_from(">I", dol, i)[0], struct.unpack_from(">I", dol, 0x48+i)[0], struct.unpack_from(">I", dol, 0x90+i)[0]) for i in range(0, 0x1c, 4)]
+        data = [(struct.unpack_from(">I", dol, 0x1c+i)[0], struct.unpack_from(">I", dol, 0x64+i)[0], struct.unpack_from(">I", dol, 0xac+i)[0]) for i in range(0, 0x2c, 4)]
+        segs = [(off, addr, size) for off, addr, size in text+data if off and size]
+        print("Standard CRT DOL entry:", hex(entry))
+        print("Standard CRT DOL segments:", [(hex(o), hex(a), hex(s)) for o,a,s in segs])
+        assert entry >= 0x80003400, "Entry point is below HBC minimum load address"
+        assert any(addr <= entry < addr+size for _,addr,size in segs), "Entry point is not in a load segment"
+        app_min, app_max = 0x80003400, 0x8132FBFF
+        for off, addr, size in segs:
+            assert addr >= app_min and addr + size - 1 <= app_max, f"Segment outside HBC load window: {hex(addr)}+{hex(size)}"
+            assert off + size <= len(dol), "Segment extends beyond DOL"
+        bss_addr, bss_size = struct.unpack_from(">II", dol, 0xD8)
+        assert bss_size == 0 or (bss_addr >= app_min and bss_addr + bss_size - 1 <= app_max), "BSS outside HBC load window"
+        print("Standard CRT DOL BSS:", hex(bss_addr), hex(bss_size))
+        print("HBC load-window check: OK")
+        PY
+    - name: Publish standard-CRT HBC DOL
+      uses: actions/upload-artifact@v4
+      with:
+        path: "channel/channelapp/hbc-standard.dol"
+        name: HBC WUPC standard CRT SD candidate
     - name: Build standalone DOL candidate from uncompressed app ELF
       run: |
         cd channel/channelapp
