@@ -40,14 +40,24 @@ jobs:
         phoff = struct.unpack_from(">I", elf, 28)[0]
         phentsize = struct.unpack_from(">H", elf, 42)[0]
         phnum = struct.unpack_from(">H", elf, 44)[0]
-        bss_regions = []
-        for i in range(phnum):
-            off = phoff + i * phentsize
-            p_type, p_offset, p_vaddr, p_paddr, p_filesz, p_memsz, p_flags, p_align = struct.unpack_from(">8I", elf, off)
-            if p_type == 1 and (p_flags & 2) and p_memsz > p_filesz:
-                bss_regions.append((p_vaddr + p_filesz, p_memsz - p_filesz))
-        assert len(bss_regions) == 1, f"Expected one trailing writable BSS region, got {bss_regions}"
-        bss_addr, bss_size = bss_regions[0]
+        shoff = struct.unpack_from(">I", elf, 32)[0]
+        shentsize = struct.unpack_from(">H", elf, 46)[0]
+        shnum = struct.unpack_from(">H", elf, 48)[0]
+        shstrndx = struct.unpack_from(">H", elf, 50)[0]
+        shstr = struct.unpack_from(">10I", elf, shoff + shstrndx * shentsize)
+        shstr_data = elf[shstr[4]:shstr[4] + shstr[5]]
+        sections = {}
+        for i in range(shnum):
+            sh = struct.unpack_from(">10I", elf, shoff + i * shentsize)
+            name = shstr_data[sh[0]:].split(bytes((0,)), 1)[0].decode("ascii")
+            if name in (".sbss", ".bss"):
+                assert sh[1] == 8, f"{name} is not SHT_NOBITS"
+                sections[name] = (sh[3], sh[5])
+        assert ".sbss" in sections and ".bss" in sections, f"Missing BSS sections: {sections}"
+        bss_addr = sections[".sbss"][0]
+        bss_end = sections[".bss"][0] + sections[".bss"][1]
+        assert bss_addr + sections[".sbss"][1] == sections[".bss"][0], "BSS sections are not contiguous"
+        bss_size = bss_end - bss_addr
         struct.pack_into(">I", dol, 0xD8, bss_addr)
         struct.pack_into(">I", dol, 0xDC, bss_size)
         with open("wupc-test.dol", "wb") as f:
@@ -84,7 +94,7 @@ jobs:
         assert any(addr == entry for _,addr,_ in segs), "Entry point is not in a load segment"
         assert len(segs) > 1, "Expected multiple native DOL segments, not a single packed loader segment"
         bss_addr, bss_size = struct.unpack_from(">II", open(p, "rb").read(0x100), 0xD8)
-        assert bss_addr == 0x815A3D40 and bss_size == 0x93E80, "Unexpected BSS range"
+        assert bss_addr == 0x815A3D40 and bss_size == 0x93880, "Unexpected BSS range"
         print("DOL BSS:", hex(bss_addr), hex(bss_size))
         PY
         ${DEVKITPPC}/bin/powerpc-eabi-readelf -h -l -S channelapp-channel.elf > hbc-channel-elf-report.txt
