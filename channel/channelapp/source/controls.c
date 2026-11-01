@@ -9,6 +9,7 @@
 
 #include "controls.h"
 #include "gfx.h"
+#include <wupc/wupc.h>
 
 static s32 pointer_owner = -1;
 WPADData *wpads[WPAD_MAX_WIIMOTES];
@@ -18,6 +19,7 @@ static int rumbling = 0;
 void controls_init (void) {
 	int i;
 
+	WUPC_Init();
 	i = WPAD_Init ();
 
 	if(i < 0) {
@@ -33,6 +35,7 @@ void controls_init (void) {
 }
 
 void controls_deinit (void) {
+	WUPC_Shutdown();
 	WPAD_Shutdown ();
 }
 
@@ -99,6 +102,44 @@ static u32 wpad_button_transform(WPADData *wd, u32 btns) {
 	return (btns&0xffff) << 16;
 }
 
+/* libwupc reports Classic Controller button masks in the upper 16 bits. */
+static u32 wupc_button_transform(u32 btns) {
+	btns >>= 16;
+
+	if(btns & WPAD_CLASSIC_BUTTON_LEFT)
+		btns |= WPAD_BUTTON_LEFT;
+	if(btns & WPAD_CLASSIC_BUTTON_RIGHT)
+		btns |= WPAD_BUTTON_RIGHT;
+	if(btns & WPAD_CLASSIC_BUTTON_UP)
+		btns |= WPAD_BUTTON_UP;
+	if(btns & WPAD_CLASSIC_BUTTON_DOWN)
+		btns |= WPAD_BUTTON_DOWN;
+	if(btns & WPAD_CLASSIC_BUTTON_A)
+		btns |= WPAD_BUTTON_A;
+	if(btns & WPAD_CLASSIC_BUTTON_B)
+		btns |= WPAD_BUTTON_B;
+	if(btns & WPAD_CLASSIC_BUTTON_X)
+		btns |= WPAD_BUTTON_1;
+	if(btns & WPAD_CLASSIC_BUTTON_Y)
+		btns |= WPAD_BUTTON_2;
+	if(btns & WPAD_CLASSIC_BUTTON_MINUS)
+		btns |= WPAD_BUTTON_MINUS;
+	if(btns & WPAD_CLASSIC_BUTTON_PLUS)
+		btns |= WPAD_BUTTON_PLUS;
+	if(btns & WPAD_CLASSIC_BUTTON_FULL_L)
+		btns |= PADW_BUTTON_PAGE_PREV;
+	if(btns & WPAD_CLASSIC_BUTTON_FULL_R)
+		btns |= PADW_BUTTON_PAGE_NEXT;
+	if(btns & WPAD_CLASSIC_BUTTON_HOME)
+		btns |= WPAD_BUTTON_HOME;
+	if(btns & WPAD_CLASSIC_BUTTON_ZR)
+		btns |= PADW_BUTTON_NET_INIT;
+	if(btns & WPAD_CLASSIC_BUTTON_ZL)
+		btns |= PADW_BUTTON_SCREENSHOT;
+
+	return (btns & 0xffff) << 16;
+}
+
 void controls_scan (u32 *down, u32 *held, u32 *up) {
 	u32 bd, bh, bu;
 	int i;
@@ -110,6 +151,7 @@ void controls_scan (u32 *down, u32 *held, u32 *up) {
 	bh = PAD_ButtonsHeld (0);
 	bu = PAD_ButtonsUp (0);
 
+	WUPC_UpdateButtonStats();
 	WPAD_ScanPads ();
 
 	for(i=0;i<WPAD_MAX_WIIMOTES;i++)
@@ -150,6 +192,14 @@ void controls_scan (u32 *down, u32 *held, u32 *up) {
 				bu |= wpad_button_transform(wpads[i], wpads[i]->btns_u);
 			}
 		}
+	}
+
+	/* Wii U Pro Controllers have no IR pointer, so merge their buttons
+	 * independently of the Wii Remote pointer-owner selection. */
+	for(i = 0; i < 4; ++i) {
+		bd |= wupc_button_transform(WUPC_ButtonsDown(i));
+		bh |= wupc_button_transform(WUPC_ButtonsHeld(i));
+		bu |= wupc_button_transform(WUPC_ButtonsUp(i));
 	}
 
 	if(last_owner >= 0 && last_owner != pointer_owner && rumbling) {
