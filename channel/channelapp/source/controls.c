@@ -159,6 +159,19 @@ void controls_scan (u32 *down, u32 *held, u32 *up) {
 		}
 	}
 
+	/* A Wii U Pro Controller has no IR pointer. Keep its input active
+	 * even when a Wii Remote owns the pointer. */
+	if (pointer_owner >= 0) {
+		for (i = 0; i < WPAD_MAX_WIIMOTES; ++i) {
+			if (wpads[i] && wpads[i]->exp.type == WPAD_EXP_CLASSIC &&
+			    wpads[i]->exp.classic.type == CLASSIC_TYPE_WIIU) {
+				bd |= wpad_button_transform(wpads[i], wpads[i]->btns_d);
+				bh |= wpad_button_transform(wpads[i], wpads[i]->btns_h);
+				bu |= wpad_button_transform(wpads[i], wpads[i]->btns_u);
+			}
+		}
+	}
+
 	if(last_owner >= 0 && last_owner != pointer_owner && rumbling) {
 		WPAD_Rumble (last_owner, 0);
 		if(pointer_owner >= 0)
