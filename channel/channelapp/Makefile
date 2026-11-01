@@ -44,7 +44,8 @@ MACHDEP = -g -DGEKKO -mrvl -mcpu=750 -meabi -mhard-float
 CFLAGS = $(MACHDEP) -Os -Wall -DBASE_ADDR=$(BASE_ADDR) $(DIR_INCLUDES:%=-I%)
 # using -Os for the stub makes it dependent on libgcc
 CFLAGS_STUB = $(MACHDEP) -O2 -Wall -DBASE_ADDR=$(BASE_ADDR) $(DIR_INCLUDES:%=-I%)
-CFLAGS_STANDALONE = $(MACHDEP) -Os -Wall -DBASE_ADDR=$(BASE_ADDR_STANDALONE) $(DIR_INCLUDES:%=-I%)
+# The standalone SD build includes an on-screen startup trace for diagnosis.
+CFLAGS_STANDALONE = $(MACHDEP) -Os -Wall -DHBC_STARTUP_DIAGNOSTIC -DBASE_ADDR=$(BASE_ADDR_STANDALONE) $(DIR_INCLUDES:%=-I%)
 ASFLAGS = -D_LANGUAGE_ASSEMBLY -DHW_RVL
 LDFLAGS_STUB = $(MACHDEP) -Wl,-e,_start -Wl,--section-start,.init=0x80001800 -nostartfiles -nodefaultlibs
 LDFLAGS_APP = $(MACHDEP) -specs=newrvl.spec -Wl,--section-start,.init=$(BASE_ADDR) \
