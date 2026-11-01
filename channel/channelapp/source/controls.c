@@ -37,6 +37,8 @@ void controls_deinit (void) {
 }
 
 static u32 wpad_button_transform(WPADData *wd, u32 btns) {
+	u32 extra_buttons = 0;
+
 	btns &= ~PADW_BUTTON_NET_INIT;
 	btns &= ~PADW_BUTTON_SCREENSHOT;
 
@@ -65,10 +67,14 @@ static u32 wpad_button_transform(WPADData *wd, u32 btns) {
 			if(btns & WPAD_CLASSIC_BUTTON_Y)
 				btns |= WPAD_BUTTON_2;
 			if (wd->exp.classic.type == CLASSIC_TYPE_WIIU) {
+				/* Do not put page flags into the raw button word.
+				 * libogc's classic D-pad DOWN/RIGHT masks are
+				 * 0x40000000/0x80000000, which overlap those flags.
+				 */
 				if (btns & WPAD_CLASSIC_BUTTON_FULL_L)
-					btns |= PADW_BUTTON_PAGE_PREV;
+					extra_buttons |= PADW_BUTTON_PAGE_PREV;
 				if (btns & WPAD_CLASSIC_BUTTON_FULL_R)
-					btns |= PADW_BUTTON_PAGE_NEXT;
+					extra_buttons |= PADW_BUTTON_PAGE_NEXT;
 			} else {
 				if((btns & WPAD_CLASSIC_BUTTON_FULL_L) || (btns & WPAD_CLASSIC_BUTTON_MINUS))
 					btns |= WPAD_BUTTON_MINUS;
@@ -103,7 +109,10 @@ static u32 wpad_button_transform(WPADData *wd, u32 btns) {
 				btns |= WPAD_BUTTON_1;
 			break;
 	}
-	return ((btns & 0xffff) << 16) | (btns & (PADW_BUTTON_PAGE_PREV | PADW_BUTTON_PAGE_NEXT));
+	/* Return only translated WPAD button bits plus our isolated flags.
+	 * Never leak raw extension-button masks into the common button word.
+	 */
+	return ((btns & 0xffff) << 16) | extra_buttons;
 }
 
 void controls_scan (u32 *down, u32 *held, u32 *up) {
