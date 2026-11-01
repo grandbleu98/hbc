@@ -376,6 +376,14 @@ void main_real(void) {
 			browser_switch_mode();
 	}
 
+#ifdef HBC_FORCE_GRID
+	/* The SD test DOL may not find the installed channel's saved settings.
+	 * Keep the familiar 3-column x 5-row grid when no grid preference loaded.
+	 */
+	if (settings.browse_mode != 1)
+		browser_switch_mode();
+#endif
+
 #ifdef ENABLE_UPDATES
 	update_check = 60;
 #endif
