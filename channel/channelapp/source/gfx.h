@@ -71,6 +71,10 @@ extern bool widescreen;
 extern u16 view_height, view_width;
 
 void gfx_init_video (void);
+#ifdef HBC_STARTUP_DIAGNOSTIC
+void gfx_debug_boot(void);
+void gfx_debug_stage(const char *stage);
+#endif
 void gfx_init (void);
 void gfx_deinit (void);
 
