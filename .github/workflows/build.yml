@@ -27,8 +27,17 @@ jobs:
       run: |
         cd channel
         make
+    - name: Build standalone test DOL
+      run: |
+        cd channel/channelapp
+        ${DEVKITPRO}/tools/bin/elf2dol channelapp_nopax.elf boot.dol
     - name: Publish WAD
       uses: actions/upload-artifact@v4
       with:
         path: "channel/title/channel_retail.wad"
         name: The Homebrew Channel
+    - name: Publish standalone test DOL
+      uses: actions/upload-artifact@v4
+      with:
+        path: "channel/channelapp/boot.dol"
+        name: HBC WUPC test DOL
