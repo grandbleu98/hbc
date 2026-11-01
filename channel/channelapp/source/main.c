@@ -586,10 +586,10 @@ void main_real(void) {
 					continue;
 				}
 
-				if ((bd | bh) & PADS_MINUS)
+				if ((bd | bh) & (PADS_MINUS | PADS_PAGE_PREV))
 					browser_gen_view(BA_PREV, NULL);
 
-				if ((bd | bh) & PADS_PLUS)
+				if ((bd | bh) & (PADS_PLUS | PADS_PAGE_NEXT))
 					browser_gen_view(BA_NEXT, NULL);
 			}
 
