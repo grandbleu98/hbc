@@ -79,14 +79,13 @@ jobs:
       run: |
         cd channel/channelapp
         ${DEVKITPPC}/bin/powerpc-eabi-readelf -h -l -S channelapp_nopax.elf > hbc-elf-report.txt
-        ${DEVKITPRO}/tools/bin/elf2dol channelapp_nopax.elf wupc-test.dol
         python3 - <<'PY'
         import struct
         p = "wupc-test.dol"
         b = open(p, "rb").read(0x100)
         entry = struct.unpack_from(">I", b, 0xE0)[0]
         text = [(struct.unpack_from(">I", b, i)[0], struct.unpack_from(">I", b, 0x48+i)[0], struct.unpack_from(">I", b, 0x90+i)[0]) for i in range(0, 0x1c, 4)]
-        data = [(struct.unpack_from(">I", b, 0x1c+i)[0], struct.unpack_from(">I", b, 0x64+i)[0], struct.unpack_from(">I", b, 0xac+i)[0]) for i in range(0, 0x1c, 4)]
+        data = [(struct.unpack_from(">I", b, 0x1c+i)[0], struct.unpack_from(">I", b, 0x64+i)[0], struct.unpack_from(">I", b, 0xac+i)[0]) for i in range(0, 0x2c, 4)]
         segs = [(off, addr, size) for off, addr, size in text+data if off and size]
         print("DOL entry:", hex(entry))
         print("DOL load segments:", [(hex(o), hex(a), hex(s)) for o,a,s in segs])
