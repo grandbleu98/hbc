@@ -41,3 +41,23 @@ jobs:
       with:
         path: "channel/channelapp/boot.dol"
         name: HBC WUPC test DOL
+
+    - name: Inspect standalone build inputs
+      run: |
+        cd channel/channelapp
+        ${DEVKITPPC}/bin/powerpc-eabi-readelf -h -l -S channelapp_nopax.elf > hbc-elf-report.txt
+        ${DEVKITPPC}/bin/powerpc-eabi-size channelapp_nopax.elf channelapp.elf channelapp-channel.elf > hbc-size-report.txt
+        ls -lh channelapp_nopax.elf channelapp.elf channelapp-channel.elf boot.dol channelapp.map > hbc-file-report.txt
+    - name: Publish build diagnostics
+      uses: actions/upload-artifact@v4
+      with:
+        path: |
+          channel/channelapp/channelapp_nopax.elf
+          channel/channelapp/channelapp.elf
+          channel/channelapp/channelapp-channel.elf
+          channel/channelapp/boot.dol
+          channel/channelapp/channelapp.map
+          channel/channelapp/hbc-elf-report.txt
+          channel/channelapp/hbc-size-report.txt
+          channel/channelapp/hbc-file-report.txt
+        name: HBC build diagnostics
