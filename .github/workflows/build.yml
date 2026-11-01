@@ -27,10 +27,10 @@ jobs:
       run: |
         cd channel
         make
-    - name: Build standalone DOL candidate from channel ELF
+    - name: Build standalone DOL candidate from devkitPPC ELF
       run: |
         cd channel/channelapp
-        ${DEVKITPRO}/tools/bin/elf2dol channelapp-channel.elf wupc-test.dol
+        ${DEVKITPRO}/tools/bin/elf2dol channelapp.elf wupc-test.dol
     - name: Publish WAD
       uses: actions/upload-artifact@v4
       with:
@@ -45,7 +45,8 @@ jobs:
     - name: Inspect standalone build inputs
       run: |
         cd channel/channelapp
-        ${DEVKITPPC}/bin/powerpc-eabi-readelf -h -l -S channelapp-channel.elf > hbc-elf-report.txt
+        ${DEVKITPPC}/bin/powerpc-eabi-readelf -h -l -S channelapp.elf > hbc-elf-report.txt
+        ${DEVKITPPC}/bin/powerpc-eabi-readelf -h -l -S channelapp-channel.elf > hbc-channel-elf-report.txt
         ${DEVKITPPC}/bin/powerpc-eabi-size channelapp_nopax.elf channelapp.elf channelapp-channel.elf > hbc-size-report.txt
         ls -lh channelapp_nopax.elf channelapp.elf channelapp-channel.elf wupc-test.dol channelapp.map > hbc-file-report.txt
     - name: Publish build diagnostics
@@ -58,6 +59,7 @@ jobs:
           channel/channelapp/wupc-test.dol
           channel/channelapp/channelapp.map
           channel/channelapp/hbc-elf-report.txt
+          channel/channelapp/hbc-channel-elf-report.txt
           channel/channelapp/hbc-size-report.txt
           channel/channelapp/hbc-file-report.txt
         name: HBC build diagnostics
