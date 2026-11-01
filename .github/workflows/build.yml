@@ -18,7 +18,7 @@ jobs:
       run: |
         sudo apt update && \
         sudo apt install -y gcc sox gettext libpng-dev xxd python3-pip
-        pip install pycryptodome
+        python3 -m pip install --break-system-packages pycryptodome
     - name: Build WiiPAX
       run: |
         cd wiipax
