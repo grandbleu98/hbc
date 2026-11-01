@@ -7,6 +7,9 @@ endif
 
 include $(DEVKITPPC)/wii_rules
 
+# Use the devkitPPC compiler driver for the final link, not the host ld.
+export LD := $(CC)
+
 TARGET := hbc-loader-probe
 BUILD := build
 SOURCES := source
