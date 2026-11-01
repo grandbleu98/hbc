@@ -99,7 +99,23 @@ jobs:
             assert addr >= app_min and addr + size - 1 <= app_max, f"DOL segment outside HBC load window: {hex(addr)}+{hex(size)}"
             assert off + size <= __import__("os").path.getsize(p), "DOL segment extends beyond file"
         bss_addr, bss_size = struct.unpack_from(">II", open(p, "rb").read(0x100), 0xD8)
-        assert bss_addr == 0x81273D40 and bss_size == 0x93880, "Unexpected BSS range"
+        elf = open("channelapp_standalone_nopax.elf", "rb").read()
+        shoff = struct.unpack_from(">I", elf, 32)[0]
+        shentsize = struct.unpack_from(">H", elf, 46)[0]
+        shnum = struct.unpack_from(">H", elf, 48)[0]
+        shstrndx = struct.unpack_from(">H", elf, 50)[0]
+        shstr = struct.unpack_from(">10I", elf, shoff + shstrndx * shentsize)
+        shstr_data = elf[shstr[4]:shstr[4] + shstr[5]]
+        sections = {}
+        for i in range(shnum):
+            sh = struct.unpack_from(">10I", elf, shoff + i * shentsize)
+            name = shstr_data[sh[0]:].split(bytes((0,)), 1)[0].decode("ascii")
+            if name in (".sbss", ".bss"):
+                sections[name] = (sh[3], sh[5])
+        assert ".sbss" in sections and ".bss" in sections, "Missing ELF BSS sections"
+        expected_bss_addr = sections[".sbss"][0]
+        expected_bss_size = sections[".bss"][0] + sections[".bss"][1] - expected_bss_addr
+        assert bss_addr == expected_bss_addr and bss_size == expected_bss_size, "DOL BSS differs from ELF BSS"
         assert bss_addr + bss_size <= 0x81330000, "DOL BSS overlaps the channel HBC image"
         print("DOL BSS:", hex(bss_addr), hex(bss_size))
         print("HBC app load window check: OK")
@@ -112,6 +128,8 @@ jobs:
       with:
         path: |
           channel/channelapp/channelapp_nopax.elf
+          channel/channelapp/channelapp_standalone_nopax.elf
+          channel/channelapp/channelapp_standalone.map
           channel/channelapp/channelapp.elf
           channel/channelapp/channelapp-channel.elf
           channel/channelapp/wupc-test.dol
