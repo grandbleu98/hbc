@@ -205,15 +205,33 @@ static void main_pre(void) {
 #endif
 
 	AUDIO_Init(NULL);
+#ifdef HBC_STARTUP_DIAGNOSTIC
+	gfx_debug_stage("AUDIO_Init returned");
+#endif
 	DSP_Init();
+#ifdef HBC_STARTUP_DIAGNOSTIC
+	gfx_debug_stage("DSP_Init returned");
+#endif
 	AUDIO_StopDMA();
 	AUDIO_RegisterDMACallback(NULL);
+#ifdef HBC_STARTUP_DIAGNOSTIC
+	gfx_debug_stage("Audio shutdown calls returned");
+#endif
 
 	gfx_init_video();
+#ifdef HBC_STARTUP_DIAGNOSTIC
+	gfx_debug_stage("gfx_init_video returned");
+#endif
 	PAD_Init();
+#ifdef HBC_STARTUP_DIAGNOSTIC
+	gfx_debug_stage("PAD_Init returned");
+#endif
 
 	SYS_SetResetCallback(reset_cb);
 	title_init();
+#ifdef HBC_STARTUP_DIAGNOSTIC
+	gfx_debug_stage("title_init returned");
+#endif
 	SYS_SetPowerCallback(power_cb);
 
 	gprintf("installing stub (%u)\n", stub_bin_size);
@@ -233,21 +251,63 @@ static void main_pre(void) {
 			IOS_GetVersion(), IOS_GetRevisionMajor(), IOS_GetRevisionMinor());
 
 	ISFS_Initialize();
+#ifdef HBC_STARTUP_DIAGNOSTIC
+	gfx_debug_stage("ISFS_Initialize returned");
+#endif
 
 	WiiDVD_StopMotorAsync();
+#ifdef HBC_STARTUP_DIAGNOSTIC
+	gfx_debug_stage("WiiDVD_StopMotorAsync returned");
+#endif
 
 	gfx_init();
+#ifdef HBC_STARTUP_DIAGNOSTIC
+	gfx_debug_stage("gfx_init returned");
+#endif
 	app_entry_init();
+#ifdef HBC_STARTUP_DIAGNOSTIC
+	gfx_debug_stage("app_entry_init returned");
+#endif
 	theme_xml_init();
+#ifdef HBC_STARTUP_DIAGNOSTIC
+	gfx_debug_stage("theme_xml_init returned");
+#endif
 	theme_init(NULL, 0);
+#ifdef HBC_STARTUP_DIAGNOSTIC
+	gfx_debug_stage("theme_init returned");
+#endif
 	config_language();
+#ifdef HBC_STARTUP_DIAGNOSTIC
+	gfx_debug_stage("config_language returned");
+#endif
 	loader_init();
+#ifdef HBC_STARTUP_DIAGNOSTIC
+	gfx_debug_stage("loader_init returned");
+#endif
 	controls_init();
+#ifdef HBC_STARTUP_DIAGNOSTIC
+	gfx_debug_stage("controls_init returned");
+#endif
 	cursors_init();
+#ifdef HBC_STARTUP_DIAGNOSTIC
+	gfx_debug_stage("cursors_init returned");
+#endif
 	font_init();
+#ifdef HBC_STARTUP_DIAGNOSTIC
+	gfx_debug_stage("font_init returned");
+#endif
 	widgets_init();
+#ifdef HBC_STARTUP_DIAGNOSTIC
+	gfx_debug_stage("widgets_init returned");
+#endif
 	view_init();
+#ifdef HBC_STARTUP_DIAGNOSTIC
+	gfx_debug_stage("view_init returned");
+#endif
 	dialogs_init();
+#ifdef HBC_STARTUP_DIAGNOSTIC
+	gfx_debug_stage("dialogs_init returned");
+#endif
 }
 
 static void load_text(void)
@@ -847,7 +907,13 @@ void main_real(void) {
 }
 
 int main(int argc, char *argv[]) {
+#ifdef HBC_STARTUP_DIAGNOSTIC
+	gfx_debug_boot();
+#endif
 	main_pre();
+#ifdef HBC_STARTUP_DIAGNOSTIC
+	gfx_debug_stage("main_pre finished; entering main_real");
+#endif
 	main_real();
 	gprintf("uh oh\n");
 	return 0;
