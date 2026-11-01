@@ -27,6 +27,18 @@ jobs:
       run: |
         cd channel
         make
+    - name: Build minimal HBC loader probe
+      run: |
+        cd diagnostics/wii-loader-probe
+        make
+        mkdir -p "$GITHUB_WORKSPACE/probe-dist/apps/HBC-Loader-Probe"
+        cp hbc-loader-probe.dol "$GITHUB_WORKSPACE/probe-dist/apps/HBC-Loader-Probe/boot.dol"
+        cp meta.xml "$GITHUB_WORKSPACE/probe-dist/apps/HBC-Loader-Probe/meta.xml"
+    - name: Publish minimal HBC loader probe
+      uses: actions/upload-artifact@v4
+      with:
+        path: "probe-dist"
+        name: HBC minimal loader probe
     - name: Build standalone DOL candidate from uncompressed app ELF
       run: |
         cd channel/channelapp
