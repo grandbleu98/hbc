@@ -7,6 +7,8 @@
 // fake wiimote buttons for mapping extension buttons
 #define PADW_BUTTON_NET_INIT 0x2000
 #define PADW_BUTTON_SCREENSHOT 0x4000
+#define PADW_BUTTON_PAGE_PREV 0x80000000u
+#define PADW_BUTTON_PAGE_NEXT 0x40000000u
 
 #define PADS_A (PAD_BUTTON_A | (WPAD_BUTTON_A << 16))
 #define PADS_B (PAD_BUTTON_B | (WPAD_BUTTON_B << 16))
@@ -22,6 +24,8 @@
 #define PADS_DPAD (PADS_UP | PADS_DOWN | PADS_LEFT | PADS_RIGHT)
 #define PADS_NET_INIT (PAD_TRIGGER_Z | (PADW_BUTTON_NET_INIT << 16))
 #define PADS_SCREENSHOT (PADW_BUTTON_SCREENSHOT << 16)
+#define PADS_PAGE_PREV PADW_BUTTON_PAGE_PREV
+#define PADS_PAGE_NEXT PADW_BUTTON_PAGE_NEXT
 
 void controls_init (void);
 void controls_deinit (void);
