@@ -16,6 +16,10 @@ WIIPAX = ../../wiipax/client/wiipax
 
 BASE_ADDR = 0x81330000
 
+# Standalone SD test image stays below the channel-resident HBC image.
+BASE_ADDR_STANDALONE = 0x81000000
+DIR_BUILD_STANDALONE = $(DIR_BUILD)/standalone
+
 DIR_STUB = stub
 DIR_SRC = source
 DIR_DATA = data
@@ -40,10 +44,13 @@ MACHDEP = -g -DGEKKO -mrvl -mcpu=750 -meabi -mhard-float
 CFLAGS = $(MACHDEP) -Os -Wall -DBASE_ADDR=$(BASE_ADDR) $(DIR_INCLUDES:%=-I%)
 # using -Os for the stub makes it dependent on libgcc
 CFLAGS_STUB = $(MACHDEP) -O2 -Wall -DBASE_ADDR=$(BASE_ADDR) $(DIR_INCLUDES:%=-I%)
+CFLAGS_STANDALONE = $(MACHDEP) -Os -Wall -DBASE_ADDR=$(BASE_ADDR_STANDALONE) $(DIR_INCLUDES:%=-I%)
 ASFLAGS = -D_LANGUAGE_ASSEMBLY -DHW_RVL
 LDFLAGS_STUB = $(MACHDEP) -Wl,-e,_start -Wl,--section-start,.init=0x80001800 -nostartfiles -nodefaultlibs
 LDFLAGS_APP = $(MACHDEP) -specs=newrvl.spec -Wl,--section-start,.init=$(BASE_ADDR) \
 	      $(DIR_LIBS:%=-L%) $(LIBS:%=-l%) -Wl,-Map,channelapp.map
+LDFLAGS_APP_STANDALONE = $(MACHDEP) -specs=newrvl.spec -Wl,--section-start,.init=$(BASE_ADDR_STANDALONE) \
+	      $(DIR_LIBS:%=-L%) $(LIBS:%=-l%) -Wl,-Map,channelapp_standalone.map
 LDFLAGS_CHAN = $(MACHDEP) -specs=newrvl.spec -Wl,--section-start,.init=$(BASE_ADDR) -Wl,-e,_stub_start $(DIR_LIBS:%=-L%) $(LIBS:%=-l%) -Wl,-Map,channelapp_chan.map
 
 FILES_STUB = $(wildcard $(DIR_STUB)/*.S) $(wildcard $(DIR_STUB)/*.c)
@@ -70,6 +77,9 @@ FILES_PO_MRG = $(FILES_PO:$(DIR_I18N)/%.po=$(DIR_I18N)/merge/%.po)
 
 FILES_SRC = $(wildcard $(DIR_SRC)/*.c)
 FILES_SRC_OBJ = $(FILES_SRC:$(DIR_SRC)/%.c=$(DIR_BUILD)/%.o) \
+		$(DIR_BUILD)/$(TARGET_STUB)_bin.o $(BANNER_OBJ) \
+		$(FILES_PNG_OBJ) $(FILES_MO_OBJ) $(FILES_TTF_OBJ)
+FILES_SRC_OBJ_STANDALONE = $(FILES_SRC:$(DIR_SRC)/%.c=$(DIR_BUILD_STANDALONE)/%.o) \
 		$(DIR_BUILD)/$(TARGET_STUB)_bin.o $(BANNER_OBJ) \
 		$(FILES_PNG_OBJ) $(FILES_MO_OBJ) $(FILES_TTF_OBJ)
 
@@ -110,6 +120,10 @@ $(TARGET_STUB).elf: $(FILES_STUB_OBJ)
 $(TARGET_APP)_nopax.elf: $(FILES_SRC_OBJ) newrvl.ld
 	@echo $(@F)
 	@$(CC) $(FILES_SRC_OBJ) $(LDFLAGS_APP) -o $@
+
+$(TARGET_APP)_standalone_nopax.elf: $(FILES_SRC_OBJ_STANDALONE) newrvl.ld
+	@echo $(@F)
+	@$(CC) $(FILES_SRC_OBJ_STANDALONE) $(LDFLAGS_APP_STANDALONE) -o $@
 
 $(TARGET_APP).elf: $(TARGET_APP)_nopax.elf
 	@$(WIIPAX) -s devkitppc $< $@
@@ -180,7 +194,13 @@ $(DIR_BUILD)/%.o: $(DIR_SRC)/%.c
 	@echo $(@F)
 	@$(CC) $(CFLAGS) -MMD -MP -MF $(@:%.o=%.d) -c $< -o $@
 
+$(DIR_BUILD_STANDALONE)/%.o: $(DIR_SRC)/%.c
+	@mkdir -p $(DIR_BUILD_STANDALONE)
+	@echo $(@F)
+	@$(CC) $(CFLAGS_STANDALONE) -MMD -MP -MF $(@:%.o=%.d) -c $< -o $@
+
 -include $(FILES_SRC_OBJ:%.o=%.d)
+-include $(FILES_SRC_OBJ_STANDALONE:%.o=%.d)
 
 clean:
 	rm -rf $(DIR_BUILD) \
