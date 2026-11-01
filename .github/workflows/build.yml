@@ -79,7 +79,7 @@ jobs:
     - name: Inspect standalone build inputs
       run: |
         cd channel/channelapp
-        ${DEVKITPPC}/bin/powerpc-eabi-readelf -h -l -S channelapp_nopax.elf > hbc-elf-report.txt
+        ${DEVKITPPC}/bin/powerpc-eabi-readelf -h -l -S channelapp_standalone_nopax.elf > hbc-elf-report.txt
         python3 - <<'PY'
         import struct
         p = "wupc-test.dol"
@@ -93,9 +93,16 @@ jobs:
         assert entry == 0x81000000, "Unexpected DOL entry point"
         assert any(addr == entry for _,addr,_ in segs), "Entry point is not in a load segment"
         assert len(segs) > 1, "Expected multiple native DOL segments, not a single packed loader segment"
+        app_min = 0x80003400
+        app_max = 0x8132FBFF
+        for off, addr, size in segs:
+            assert addr >= app_min and addr + size - 1 <= app_max, f"DOL segment outside HBC load window: {hex(addr)}+{hex(size)}"
+            assert off + size <= __import__("os").path.getsize(p), "DOL segment extends beyond file"
         bss_addr, bss_size = struct.unpack_from(">II", open(p, "rb").read(0x100), 0xD8)
         assert bss_addr == 0x81273D40 and bss_size == 0x93880, "Unexpected BSS range"
+        assert bss_addr + bss_size <= 0x81330000, "DOL BSS overlaps the channel HBC image"
         print("DOL BSS:", hex(bss_addr), hex(bss_size))
+        print("HBC app load window check: OK")
         PY
         ${DEVKITPPC}/bin/powerpc-eabi-readelf -h -l -S channelapp_nopax.elf > hbc-channel-elf-report.txt
         ${DEVKITPPC}/bin/powerpc-eabi-size channelapp_standalone_nopax.elf channelapp_nopax.elf > hbc-size-report.txt
