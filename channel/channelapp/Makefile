@@ -16,9 +16,11 @@ WIIPAX = ../../wiipax/client/wiipax
 
 BASE_ADDR = 0x81330000
 
-# Standalone SD test image stays below the channel-resident HBC image.
+# Standalone SD test images. The standard build uses devkitPro's current
+# Wii linker/CRT rather than the legacy channel-specific linker script.
 BASE_ADDR_STANDALONE = 0x81000000
 DIR_BUILD_STANDALONE = $(DIR_BUILD)/standalone
+DIR_BUILD_STANDARD = $(DIR_BUILD)/standard
 
 DIR_STUB = stub
 DIR_SRC = source
@@ -46,12 +48,15 @@ CFLAGS = $(MACHDEP) -Os -Wall -DBASE_ADDR=$(BASE_ADDR) $(DIR_INCLUDES:%=-I%)
 CFLAGS_STUB = $(MACHDEP) -O2 -Wall -DBASE_ADDR=$(BASE_ADDR) $(DIR_INCLUDES:%=-I%)
 # The standalone SD build includes an on-screen startup trace for diagnosis.
 CFLAGS_STANDALONE = $(MACHDEP) -Os -Wall -DHBC_STARTUP_DIAGNOSTIC -DBASE_ADDR=$(BASE_ADDR_STANDALONE) $(DIR_INCLUDES:%=-I%)
+# Match diagnostics/wii-loader-probe: use the stock devkitPPC Wii CRT/linker.
+CFLAGS_STANDARD = $(MACHDEP) -Os -Wall -DHBC_STARTUP_DIAGNOSTIC -DBASE_ADDR=$(BASE_ADDR) $(DIR_INCLUDES:%=-I%)
 ASFLAGS = -D_LANGUAGE_ASSEMBLY -DHW_RVL
 LDFLAGS_STUB = $(MACHDEP) -Wl,-e,_start -Wl,--section-start,.init=0x80001800 -nostartfiles -nodefaultlibs
 LDFLAGS_APP = $(MACHDEP) -specs=newrvl.spec -Wl,--section-start,.init=$(BASE_ADDR) \
 	      $(DIR_LIBS:%=-L%) $(LIBS:%=-l%) -Wl,-Map,channelapp.map
 LDFLAGS_APP_STANDALONE = $(MACHDEP) -specs=newrvl.spec -Wl,--section-start,.init=$(BASE_ADDR_STANDALONE) \
 	      $(DIR_LIBS:%=-L%) $(LIBS:%=-l%) -Wl,-Map,channelapp_standalone.map
+LDFLAGS_APP_STANDARD = $(MACHDEP) $(DIR_LIBS:%=-L%) $(LIBS:%=-l%) -Wl,-Map,channelapp_standard.map
 LDFLAGS_CHAN = $(MACHDEP) -specs=newrvl.spec -Wl,--section-start,.init=$(BASE_ADDR) -Wl,-e,_stub_start $(DIR_LIBS:%=-L%) $(LIBS:%=-l%) -Wl,-Map,channelapp_chan.map
 
 FILES_STUB = $(wildcard $(DIR_STUB)/*.S) $(wildcard $(DIR_STUB)/*.c)
@@ -81,6 +86,9 @@ FILES_SRC_OBJ = $(FILES_SRC:$(DIR_SRC)/%.c=$(DIR_BUILD)/%.o) \
 		$(DIR_BUILD)/$(TARGET_STUB)_bin.o $(BANNER_OBJ) \
 		$(FILES_PNG_OBJ) $(FILES_MO_OBJ) $(FILES_TTF_OBJ)
 FILES_SRC_OBJ_STANDALONE = $(FILES_SRC:$(DIR_SRC)/%.c=$(DIR_BUILD_STANDALONE)/%.o) \
+		$(DIR_BUILD)/$(TARGET_STUB)_bin.o $(BANNER_OBJ) \
+		$(FILES_PNG_OBJ) $(FILES_MO_OBJ) $(FILES_TTF_OBJ)
+FILES_SRC_OBJ_STANDARD = $(FILES_SRC:$(DIR_SRC)/%.c=$(DIR_BUILD_STANDARD)/%.o) \
 		$(DIR_BUILD)/$(TARGET_STUB)_bin.o $(BANNER_OBJ) \
 		$(FILES_PNG_OBJ) $(FILES_MO_OBJ) $(FILES_TTF_OBJ)
 
@@ -125,6 +133,10 @@ $(TARGET_APP)_nopax.elf: $(FILES_SRC_OBJ) newrvl.ld
 $(TARGET_APP)_standalone_nopax.elf: $(FILES_SRC_OBJ_STANDALONE) newrvl.ld
 	@echo $(@F)
 	@$(CC) $(FILES_SRC_OBJ_STANDALONE) $(LDFLAGS_APP_STANDALONE) -o $@
+
+$(TARGET_APP)_standard.elf: $(FILES_SRC_OBJ_STANDARD)
+	@echo $(@F)
+	@$(CC) $(FILES_SRC_OBJ_STANDARD) $(LDFLAGS_APP_STANDARD) -o $@
 
 $(TARGET_APP).elf: $(TARGET_APP)_nopax.elf
 	@$(WIIPAX) -s devkitppc $< $@
@@ -200,8 +212,14 @@ $(DIR_BUILD_STANDALONE)/%.o: $(DIR_SRC)/%.c
 	@echo $(@F)
 	@$(CC) $(CFLAGS_STANDALONE) -MMD -MP -MF $(@:%.o=%.d) -c $< -o $@
 
+$(DIR_BUILD_STANDARD)/%.o: $(DIR_SRC)/%.c
+	@mkdir -p $(DIR_BUILD_STANDARD)
+	@echo $(@F)
+	@$(CC) $(CFLAGS_STANDARD) -MMD -MP -MF $(@:%.o=%.d) -c $< -o $@
+
 -include $(FILES_SRC_OBJ:%.o=%.d)
 -include $(FILES_SRC_OBJ_STANDALONE:%.o=%.d)
+-include $(FILES_SRC_OBJ_STANDARD:%.o=%.d)
 
 clean:
 	rm -rf $(DIR_BUILD) \
