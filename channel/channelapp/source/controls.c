@@ -104,8 +104,9 @@ static u32 wpad_button_transform(WPADData *wd, u32 btns) {
 
 /* libwupc reports Classic Controller button masks in the upper 16 bits. */
 static u32 wupc_button_transform(u32 btns) {
-	btns >>= 16;
+	u32 result;
 
+	/* WUPC button bits use the Classic Controller's upper-16-bit layout. */
 	if(btns & WPAD_CLASSIC_BUTTON_LEFT)
 		btns |= WPAD_BUTTON_LEFT;
 	if(btns & WPAD_CLASSIC_BUTTON_RIGHT)
@@ -126,10 +127,6 @@ static u32 wupc_button_transform(u32 btns) {
 		btns |= WPAD_BUTTON_MINUS;
 	if(btns & WPAD_CLASSIC_BUTTON_PLUS)
 		btns |= WPAD_BUTTON_PLUS;
-	if(btns & WPAD_CLASSIC_BUTTON_FULL_L)
-		btns |= PADW_BUTTON_PAGE_PREV;
-	if(btns & WPAD_CLASSIC_BUTTON_FULL_R)
-		btns |= PADW_BUTTON_PAGE_NEXT;
 	if(btns & WPAD_CLASSIC_BUTTON_HOME)
 		btns |= WPAD_BUTTON_HOME;
 	if(btns & WPAD_CLASSIC_BUTTON_ZR)
@@ -137,9 +134,14 @@ static u32 wupc_button_transform(u32 btns) {
 	if(btns & WPAD_CLASSIC_BUTTON_ZL)
 		btns |= PADW_BUTTON_SCREENSHOT;
 
-	return (btns & 0xffff) << 16;
-}
+	result = (btns & 0xffff) << 16;
+	if(btns & WPAD_CLASSIC_BUTTON_FULL_L)
+		result |= PADS_PAGE_PREV;
+	if(btns & WPAD_CLASSIC_BUTTON_FULL_R)
+		result |= PADS_PAGE_NEXT;
 
+	return result;
+}
 void controls_scan (u32 *down, u32 *held, u32 *up) {
 	u32 bd, bh, bu;
 	int i;
