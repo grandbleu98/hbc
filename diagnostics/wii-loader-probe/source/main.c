@@ -11,7 +11,7 @@ int main(int argc, char **argv)
     int wpad_result;
 
     VIDEO_Init();
-    WPAD_Init();
+    wpad_result = WPAD_Init();
 
     rmode = VIDEO_GetPreferredMode(NULL);
     xfb = MEM_K0_TO_K1(SYS_AllocateFramebuffer(rmode));
@@ -28,8 +28,6 @@ int main(int argc, char **argv)
     VIDEO_WaitVSync();
     if (rmode->viTVMode & VI_NON_INTERLACE)
         VIDEO_WaitVSync();
-
-    wpad_result = WPAD_Init();
 
     printf("\x1b[2J\x1b[2;0H");
     printf("HBC LOADER PROBE\n");
