@@ -12,8 +12,12 @@
 
 OUTPUT_FORMAT("elf32-powerpc", "elf32-powerpc", "elf32-powerpc");
 OUTPUT_ARCH(powerpc:common);
-EXTERN(_start);
-ENTRY(_start);
+EXTERN(__app_start);
+ENTRY(__app_start);
+
+/* Match the current devkitPPC/libogc CRT ABI. */
+PROVIDE_HIDDEN(__ppc_excpt_buf = 0x800000d0);
+PROVIDE_HIDDEN(__ppc_excpt_table = 0x80003000);
 
 PHDRS
 {
@@ -41,6 +45,7 @@ SECTIONS
 	/* Program */
 	.init          :
 	{
+		KEEP (*(.crt0 .crt0.*))
 		KEEP (*crt0.o(*.init))
 		KEEP (*(.init))
 	} :text = 0

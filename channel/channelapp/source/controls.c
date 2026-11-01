@@ -37,6 +37,8 @@ void controls_deinit (void) {
 }
 
 static u32 wpad_button_transform(WPADData *wd, u32 btns) {
+	u32 extra_buttons = 0;
+
 	btns &= ~PADW_BUTTON_NET_INIT;
 	btns &= ~PADW_BUTTON_SCREENSHOT;
 
@@ -64,10 +66,21 @@ static u32 wpad_button_transform(WPADData *wd, u32 btns) {
 				btns |= WPAD_BUTTON_1;
 			if(btns & WPAD_CLASSIC_BUTTON_Y)
 				btns |= WPAD_BUTTON_2;
-			if((btns & WPAD_CLASSIC_BUTTON_FULL_L) || (btns & WPAD_CLASSIC_BUTTON_MINUS))
-				btns |= WPAD_BUTTON_MINUS;
-			if((btns & WPAD_CLASSIC_BUTTON_FULL_R) || (btns & WPAD_CLASSIC_BUTTON_PLUS))
-				btns |= WPAD_BUTTON_PLUS;
+			if (wd->exp.classic.type == CLASSIC_TYPE_WIIU) {
+				/* Do not put page flags into the raw button word.
+				 * libogc's classic D-pad DOWN/RIGHT masks are
+				 * 0x40000000/0x80000000, which overlap those flags.
+				 */
+				if (btns & WPAD_CLASSIC_BUTTON_FULL_L)
+					extra_buttons |= PADW_BUTTON_PAGE_PREV;
+				if (btns & WPAD_CLASSIC_BUTTON_FULL_R)
+					extra_buttons |= PADW_BUTTON_PAGE_NEXT;
+			} else {
+				if((btns & WPAD_CLASSIC_BUTTON_FULL_L) || (btns & WPAD_CLASSIC_BUTTON_MINUS))
+					btns |= WPAD_BUTTON_MINUS;
+				if((btns & WPAD_CLASSIC_BUTTON_FULL_R) || (btns & WPAD_CLASSIC_BUTTON_PLUS))
+					btns |= WPAD_BUTTON_PLUS;
+			}
 			if(btns & WPAD_CLASSIC_BUTTON_HOME)
 				btns |= WPAD_BUTTON_HOME;
 			if(btns & WPAD_CLASSIC_BUTTON_ZR)
@@ -96,7 +109,10 @@ static u32 wpad_button_transform(WPADData *wd, u32 btns) {
 				btns |= WPAD_BUTTON_1;
 			break;
 	}
-	return (btns&0xffff) << 16;
+	/* Return only translated WPAD button bits plus our isolated flags.
+	 * Never leak raw extension-button masks into the common button word.
+	 */
+	return ((btns & 0xffff) << 16) | extra_buttons;
 }
 
 void controls_scan (u32 *down, u32 *held, u32 *up) {
@@ -145,6 +161,19 @@ void controls_scan (u32 *down, u32 *held, u32 *up) {
 	// otherwise just mix all buttons together
 		for(i=0;i<WPAD_MAX_WIIMOTES;i++) {
 			if(wpads[i]) {
+				bd |= wpad_button_transform(wpads[i], wpads[i]->btns_d);
+				bh |= wpad_button_transform(wpads[i], wpads[i]->btns_h);
+				bu |= wpad_button_transform(wpads[i], wpads[i]->btns_u);
+			}
+		}
+	}
+
+	/* A Wii U Pro Controller has no IR pointer. Keep its input active
+	 * even when a Wii Remote owns the pointer. */
+	if (pointer_owner >= 0) {
+		for (i = 0; i < WPAD_MAX_WIIMOTES; ++i) {
+			if (wpads[i] && wpads[i]->exp.type == WPAD_EXP_CLASSIC &&
+			    wpads[i]->exp.classic.type == CLASSIC_TYPE_WIIU) {
 				bd |= wpad_button_transform(wpads[i], wpads[i]->btns_d);
 				bh |= wpad_button_transform(wpads[i], wpads[i]->btns_h);
 				bu |= wpad_button_transform(wpads[i], wpads[i]->btns_u);

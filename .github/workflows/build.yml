@@ -2,9 +2,9 @@ name: Build HBC
 
 on:
   push:
-    branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -18,7 +18,7 @@ jobs:
       run: |
         sudo apt update && \
         sudo apt install -y gcc sox gettext libpng-dev xxd python3-pip
-        pip install pycryptodome
+        python3 -m pip install --break-system-packages pycryptodome
     - name: Build WiiPAX
       run: |
         cd wiipax
@@ -27,8 +27,158 @@ jobs:
       run: |
         cd channel
         make
+    - name: Build minimal HBC loader probe
+      run: |
+        cd diagnostics/wii-loader-probe
+        make
+        mkdir -p "$GITHUB_WORKSPACE/probe-dist/apps/HBC-Loader-Probe"
+        cp hbc-loader-probe.dol "$GITHUB_WORKSPACE/probe-dist/apps/HBC-Loader-Probe/boot.dol"
+        cp meta.xml "$GITHUB_WORKSPACE/probe-dist/apps/HBC-Loader-Probe/meta.xml"
+    - name: Publish minimal HBC loader probe
+      uses: actions/upload-artifact@v4
+      with:
+        path: "probe-dist"
+        name: HBC minimal loader probe
+    - name: Build HBC standalone with standard devkitPro Wii CRT
+      run: |
+        cd channel/channelapp
+        make channelapp_standard.elf
+        ${DEVKITPRO}/tools/bin/elf2dol channelapp_standard.elf hbc-standard.dol
+        python3 - <<'PY'
+        import os, struct
+        p = "hbc-standard.dol"
+        dol = open(p, "rb").read()
+        entry = struct.unpack_from(">I", dol, 0xE0)[0]
+        text = [(struct.unpack_from(">I", dol, i)[0], struct.unpack_from(">I", dol, 0x48+i)[0], struct.unpack_from(">I", dol, 0x90+i)[0]) for i in range(0, 0x1c, 4)]
+        data = [(struct.unpack_from(">I", dol, 0x1c+i)[0], struct.unpack_from(">I", dol, 0x64+i)[0], struct.unpack_from(">I", dol, 0xac+i)[0]) for i in range(0, 0x2c, 4)]
+        segs = [(off, addr, size) for off, addr, size in text+data if off and size]
+        print("Standard CRT DOL entry:", hex(entry))
+        print("Standard CRT DOL segments:", [(hex(o), hex(a), hex(s)) for o,a,s in segs])
+        assert entry >= 0x80003400, "Entry point is below HBC minimum load address"
+        assert any(addr <= entry < addr+size for _,addr,size in segs), "Entry point is not in a load segment"
+        app_min, app_max = 0x80003400, 0x8132FBFF
+        for off, addr, size in segs:
+            assert addr >= app_min and addr + size - 1 <= app_max, f"Segment outside HBC load window: {hex(addr)}+{hex(size)}"
+            assert off + size <= len(dol), "Segment extends beyond DOL"
+        bss_addr, bss_size = struct.unpack_from(">II", dol, 0xD8)
+        assert bss_size == 0 or (bss_addr >= app_min and bss_addr + bss_size - 1 <= app_max), "BSS outside HBC load window"
+        print("Standard CRT DOL BSS:", hex(bss_addr), hex(bss_size))
+        print("HBC load-window check: OK")
+        PY
+    - name: Publish standard-CRT HBC DOL
+      uses: actions/upload-artifact@v4
+      with:
+        path: "channel/channelapp/hbc-standard.dol"
+        name: HBC WUPC standard CRT SD candidate
+    - name: Build standalone DOL candidate from uncompressed app ELF
+      run: |
+        cd channel/channelapp
+        make channelapp_standalone_nopax.elf
+        ${DEVKITPRO}/tools/bin/elf2dol channelapp_standalone_nopax.elf wupc-test.dol
+        python3 - <<'PY'
+        import struct
+        elf = open("channelapp_standalone_nopax.elf", "rb").read()
+        dol = bytearray(open("wupc-test.dol", "rb").read())
+        assert elf[:4] == bytes((127, 69, 76, 70))
+        assert elf[4] == 1 and elf[5] == 2, "Expected big-endian ELF32"
+        phoff = struct.unpack_from(">I", elf, 28)[0]
+        phentsize = struct.unpack_from(">H", elf, 42)[0]
+        phnum = struct.unpack_from(">H", elf, 44)[0]
+        shoff = struct.unpack_from(">I", elf, 32)[0]
+        shentsize = struct.unpack_from(">H", elf, 46)[0]
+        shnum = struct.unpack_from(">H", elf, 48)[0]
+        shstrndx = struct.unpack_from(">H", elf, 50)[0]
+        shstr = struct.unpack_from(">10I", elf, shoff + shstrndx * shentsize)
+        shstr_data = elf[shstr[4]:shstr[4] + shstr[5]]
+        sections = {}
+        for i in range(shnum):
+            sh = struct.unpack_from(">10I", elf, shoff + i * shentsize)
+            name = shstr_data[sh[0]:].split(bytes((0,)), 1)[0].decode("ascii")
+            if name in (".sbss", ".bss"):
+                assert sh[1] == 8, f"{name} is not SHT_NOBITS"
+                sections[name] = (sh[3], sh[5])
+        assert ".sbss" in sections and ".bss" in sections, f"Missing BSS sections: {sections}"
+        bss_addr = sections[".sbss"][0]
+        bss_end = sections[".bss"][0] + sections[".bss"][1]
+        assert bss_addr + sections[".sbss"][1] == sections[".bss"][0], "BSS sections are not contiguous"
+        bss_size = bss_end - bss_addr
+        struct.pack_into(">I", dol, 0xD8, bss_addr)
+        struct.pack_into(">I", dol, 0xDC, bss_size)
+        with open("wupc-test.dol", "wb") as f:
+            f.write(dol)
+        print("DOL BSS:", hex(bss_addr), "+", hex(bss_size))
+        PY
     - name: Publish WAD
       uses: actions/upload-artifact@v4
       with:
         path: "channel/title/channel_retail.wad"
         name: The Homebrew Channel
+    - name: Publish standalone DOL candidate
+      uses: actions/upload-artifact@v4
+      with:
+        path: "channel/channelapp/wupc-test.dol"
+        name: HBC WUPC standalone candidate
+
+    - name: Inspect standalone build inputs
+      run: |
+        cd channel/channelapp
+        ${DEVKITPPC}/bin/powerpc-eabi-readelf -h -l -S channelapp_standalone_nopax.elf > hbc-elf-report.txt
+        python3 - <<'PY'
+        import struct
+        p = "wupc-test.dol"
+        b = open(p, "rb").read(0x100)
+        entry = struct.unpack_from(">I", b, 0xE0)[0]
+        text = [(struct.unpack_from(">I", b, i)[0], struct.unpack_from(">I", b, 0x48+i)[0], struct.unpack_from(">I", b, 0x90+i)[0]) for i in range(0, 0x1c, 4)]
+        data = [(struct.unpack_from(">I", b, 0x1c+i)[0], struct.unpack_from(">I", b, 0x64+i)[0], struct.unpack_from(">I", b, 0xac+i)[0]) for i in range(0, 0x2c, 4)]
+        segs = [(off, addr, size) for off, addr, size in text+data if off and size]
+        print("DOL entry:", hex(entry))
+        print("DOL load segments:", [(hex(o), hex(a), hex(s)) for o,a,s in segs])
+        assert entry == 0x81000000, "Unexpected DOL entry point"
+        assert any(addr == entry for _,addr,_ in segs), "Entry point is not in a load segment"
+        assert len(segs) > 1, "Expected multiple native DOL segments, not a single packed loader segment"
+        app_min = 0x80003400
+        app_max = 0x8132FBFF
+        for off, addr, size in segs:
+            assert addr >= app_min and addr + size - 1 <= app_max, f"DOL segment outside HBC load window: {hex(addr)}+{hex(size)}"
+            assert off + size <= __import__("os").path.getsize(p), "DOL segment extends beyond file"
+        bss_addr, bss_size = struct.unpack_from(">II", open(p, "rb").read(0x100), 0xD8)
+        elf = open("channelapp_standalone_nopax.elf", "rb").read()
+        shoff = struct.unpack_from(">I", elf, 32)[0]
+        shentsize = struct.unpack_from(">H", elf, 46)[0]
+        shnum = struct.unpack_from(">H", elf, 48)[0]
+        shstrndx = struct.unpack_from(">H", elf, 50)[0]
+        shstr = struct.unpack_from(">10I", elf, shoff + shstrndx * shentsize)
+        shstr_data = elf[shstr[4]:shstr[4] + shstr[5]]
+        sections = {}
+        for i in range(shnum):
+            sh = struct.unpack_from(">10I", elf, shoff + i * shentsize)
+            name = shstr_data[sh[0]:].split(bytes((0,)), 1)[0].decode("ascii")
+            if name in (".sbss", ".bss"):
+                sections[name] = (sh[3], sh[5])
+        assert ".sbss" in sections and ".bss" in sections, "Missing ELF BSS sections"
+        expected_bss_addr = sections[".sbss"][0]
+        expected_bss_size = sections[".bss"][0] + sections[".bss"][1] - expected_bss_addr
+        assert bss_addr == expected_bss_addr and bss_size == expected_bss_size, "DOL BSS differs from ELF BSS"
+        assert bss_addr + bss_size <= 0x81330000, "DOL BSS overlaps the channel HBC image"
+        print("DOL BSS:", hex(bss_addr), hex(bss_size))
+        print("HBC app load window check: OK")
+        PY
+        ${DEVKITPPC}/bin/powerpc-eabi-readelf -h -l -S channelapp_nopax.elf > hbc-channel-elf-report.txt
+        ${DEVKITPPC}/bin/powerpc-eabi-size channelapp_standalone_nopax.elf channelapp_nopax.elf > hbc-size-report.txt
+        ls -lh channelapp_standalone_nopax.elf channelapp_nopax.elf wupc-test.dol channelapp_standalone.map > hbc-file-report.txt
+    - name: Publish build diagnostics
+      uses: actions/upload-artifact@v4
+      with:
+        path: |
+          channel/channelapp/channelapp_nopax.elf
+          channel/channelapp/channelapp_standalone_nopax.elf
+          channel/channelapp/channelapp_standalone.map
+          channel/channelapp/channelapp.elf
+          channel/channelapp/channelapp-channel.elf
+          channel/channelapp/wupc-test.dol
+          channel/channelapp/channelapp.map
+          channel/channelapp/hbc-elf-report.txt
+          channel/channelapp/hbc-channel-elf-report.txt
+          channel/channelapp/hbc-size-report.txt
+          channel/channelapp/hbc-file-report.txt
+        name: HBC build diagnostics

@@ -5,6 +5,7 @@
 #include <stdio.h>
 
 #include <gccore.h>
+#include <ogc/console.h>
 #include <ogc/machine/processor.h>
 #include <ogc/lwp_watchdog.h>
 #include <ogc/conf.h>
@@ -37,6 +38,49 @@ static u32 *efb_buffer = NULL;
 u16 view_width = 0;
 u16 view_height = 0;
 bool widescreen = false;
+
+#ifdef HBC_STARTUP_DIAGNOSTIC
+static void gfx_debug_console(const char *stage)
+{
+	if (!xfb || !vmode)
+		return;
+
+	console_init(xfb, 8, 8, vmode->fbWidth, vmode->xfbHeight,
+	             vmode->fbWidth * VI_DISPLAY_PIX_SZ);
+	printf("\x1b[2J\x1b[H");
+	printf("HBC STARTUP TRACE\n\n%s\n", stage);
+	fflush(stdout);
+	VIDEO_SetNextFramebuffer(xfb);
+	VIDEO_SetBlack(FALSE);
+	VIDEO_Flush();
+	VIDEO_WaitVSync();
+}
+
+void gfx_debug_boot(void)
+{
+	VIDEO_Init();
+	vmode = VIDEO_GetPreferredMode(NULL);
+	view_width = 640;
+	view_height = 480;
+	xfb = (u32 *)SYS_AllocateFramebuffer(vmode);
+	if (!xfb)
+		while (1) VIDEO_WaitVSync();
+	DCInvalidateRange(xfb, VIDEO_GetFrameBufferSize(vmode));
+	xfb = MEM_K0_TO_K1(xfb);
+	VIDEO_Configure(vmode);
+	VIDEO_ClearFrameBuffer(vmode, xfb, COLOR_BLACK);
+	VIDEO_SetNextFramebuffer(xfb);
+	VIDEO_SetBlack(FALSE);
+	VIDEO_Flush();
+	VIDEO_WaitVSync();
+	gfx_debug_console("main() reached");
+}
+
+void gfx_debug_stage(const char *stage)
+{
+	gfx_debug_console(stage);
+}
+#endif
 
 void gfx_init_video (void) {
 	u8 i;
