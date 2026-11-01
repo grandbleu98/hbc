@@ -30,7 +30,7 @@ jobs:
     - name: Build standalone DOL candidate from uncompressed app ELF
       run: |
         cd channel/channelapp
-        \${DEVKITPRO}/tools/bin/elf2dol channelapp_nopax.elf wupc-test.dol
+        ${DEVKITPRO}/tools/bin/elf2dol channelapp_nopax.elf wupc-test.dol
         python3 - <<'PY'
         import struct
         elf = open("channelapp_nopax.elf", "rb").read()
