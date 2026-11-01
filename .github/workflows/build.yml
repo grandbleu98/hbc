@@ -30,10 +30,11 @@ jobs:
     - name: Build standalone DOL candidate from uncompressed app ELF
       run: |
         cd channel/channelapp
-        ${DEVKITPRO}/tools/bin/elf2dol channelapp_nopax.elf wupc-test.dol
+        make channelapp_standalone_nopax.elf
+        ${DEVKITPRO}/tools/bin/elf2dol channelapp_standalone_nopax.elf wupc-test.dol
         python3 - <<'PY'
         import struct
-        elf = open("channelapp_nopax.elf", "rb").read()
+        elf = open("channelapp_standalone_nopax.elf", "rb").read()
         dol = bytearray(open("wupc-test.dol", "rb").read())
         assert elf[:4] == bytes((127, 69, 76, 70))
         assert elf[4] == 1 and elf[5] == 2, "Expected big-endian ELF32"
@@ -89,16 +90,16 @@ jobs:
         segs = [(off, addr, size) for off, addr, size in text+data if off and size]
         print("DOL entry:", hex(entry))
         print("DOL load segments:", [(hex(o), hex(a), hex(s)) for o,a,s in segs])
-        assert entry == 0x81330000, "Unexpected DOL entry point"
+        assert entry == 0x81000000, "Unexpected DOL entry point"
         assert any(addr == entry for _,addr,_ in segs), "Entry point is not in a load segment"
         assert len(segs) > 1, "Expected multiple native DOL segments, not a single packed loader segment"
         bss_addr, bss_size = struct.unpack_from(">II", open(p, "rb").read(0x100), 0xD8)
-        assert bss_addr == 0x815A3D40 and bss_size == 0x93880, "Unexpected BSS range"
+        assert bss_addr == 0x81273D40 and bss_size == 0x93880, "Unexpected BSS range"
         print("DOL BSS:", hex(bss_addr), hex(bss_size))
         PY
-        ${DEVKITPPC}/bin/powerpc-eabi-readelf -h -l -S channelapp-channel.elf > hbc-channel-elf-report.txt
-        ${DEVKITPPC}/bin/powerpc-eabi-size channelapp_nopax.elf channelapp.elf channelapp-channel.elf > hbc-size-report.txt
-        ls -lh channelapp_nopax.elf channelapp.elf channelapp-channel.elf wupc-test.dol channelapp.map > hbc-file-report.txt
+        ${DEVKITPPC}/bin/powerpc-eabi-readelf -h -l -S channelapp_nopax.elf > hbc-channel-elf-report.txt
+        ${DEVKITPPC}/bin/powerpc-eabi-size channelapp_standalone_nopax.elf channelapp_nopax.elf > hbc-size-report.txt
+        ls -lh channelapp_standalone_nopax.elf channelapp_nopax.elf wupc-test.dol channelapp_standalone.map > hbc-file-report.txt
     - name: Publish build diagnostics
       uses: actions/upload-artifact@v4
       with:
