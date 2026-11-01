@@ -25,6 +25,7 @@ DIR_BUILD = build
 DIR_BUILD_CHAN = $(DIR_BUILD)/channel
 
 DIR_INCLUDES = $(DIR_BUILD) \
+		$(DIR_SRC)/include \
 		$(DEVKITPRO)/libogc/include \
 		$(DEVKITPRO)/portlibs/ppc/include \
 		$(DEVKITPRO)/portlibs/ppc/include/freetype2
@@ -42,8 +43,8 @@ CFLAGS_STUB = $(MACHDEP) -O2 -Wall -DBASE_ADDR=$(BASE_ADDR) $(DIR_INCLUDES:%=-I%
 ASFLAGS = -D_LANGUAGE_ASSEMBLY -DHW_RVL
 LDFLAGS_STUB = $(MACHDEP) -Wl,--section-start,.init=0x80001800 -nostartfiles -nodefaultlibs
 LDFLAGS_APP = $(MACHDEP) -specs=newrvl.spec -Wl,--section-start,.init=$(BASE_ADDR) \
-	      $(DIR_LIBS:%=-L%) $(LIBS:%=-l%) -Wl,-Map,channelapp.map
-LDFLAGS_CHAN = $(MACHDEP) -specs=newrvl.spec -Wl,--section-start,.init=$(BASE_ADDR) -Wl,-e,_stub_start $(DIR_LIBS:%=-L%) $(LIBS:%=-l%) -Wl,-Map,channelapp_chan.map
+	      $(DIR_LIBS:%=-L%) $(LIBS:%=-l%) -Wl,-wrap,wiiuse_register -Wl,-Map,channelapp.map
+LDFLAGS_CHAN = $(MACHDEP) -specs=newrvl.spec -Wl,--section-start,.init=$(BASE_ADDR) -Wl,-e,_stub_start $(DIR_LIBS:%=-L%) $(LIBS:%=-l%) -Wl,-wrap,wiiuse_register -Wl,-Map,channelapp_chan.map
 
 FILES_STUB = $(wildcard $(DIR_STUB)/*.S) $(wildcard $(DIR_STUB)/*.c)
 FILES_STUB_OBJx = $(FILES_STUB:$(DIR_STUB)/%.S=$(DIR_BUILD)/%.o)
