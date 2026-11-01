@@ -27,27 +27,27 @@ jobs:
       run: |
         cd channel
         make
-    - name: Build standalone test DOL
+    - name: Build standalone DOL candidate from channel ELF
       run: |
         cd channel/channelapp
-        ${DEVKITPRO}/tools/bin/elf2dol channelapp_nopax.elf boot.dol
+        ${DEVKITPRO}/tools/bin/elf2dol channelapp-channel.elf wupc-test.dol
     - name: Publish WAD
       uses: actions/upload-artifact@v4
       with:
         path: "channel/title/channel_retail.wad"
         name: The Homebrew Channel
-    - name: Publish standalone test DOL
+    - name: Publish standalone DOL candidate
       uses: actions/upload-artifact@v4
       with:
-        path: "channel/channelapp/boot.dol"
-        name: HBC WUPC test DOL
+        path: "channel/channelapp/wupc-test.dol"
+        name: HBC WUPC standalone candidate
 
     - name: Inspect standalone build inputs
       run: |
         cd channel/channelapp
-        ${DEVKITPPC}/bin/powerpc-eabi-readelf -h -l -S channelapp_nopax.elf > hbc-elf-report.txt
+        ${DEVKITPPC}/bin/powerpc-eabi-readelf -h -l -S channelapp-channel.elf > hbc-elf-report.txt
         ${DEVKITPPC}/bin/powerpc-eabi-size channelapp_nopax.elf channelapp.elf channelapp-channel.elf > hbc-size-report.txt
-        ls -lh channelapp_nopax.elf channelapp.elf channelapp-channel.elf boot.dol channelapp.map > hbc-file-report.txt
+        ls -lh channelapp_nopax.elf channelapp.elf channelapp-channel.elf wupc-test.dol channelapp.map > hbc-file-report.txt
     - name: Publish build diagnostics
       uses: actions/upload-artifact@v4
       with:
@@ -55,7 +55,7 @@ jobs:
           channel/channelapp/channelapp_nopax.elf
           channel/channelapp/channelapp.elf
           channel/channelapp/channelapp-channel.elf
-          channel/channelapp/boot.dol
+          channel/channelapp/wupc-test.dol
           channel/channelapp/channelapp.map
           channel/channelapp/hbc-elf-report.txt
           channel/channelapp/hbc-size-report.txt
